@@ -1,0 +1,68 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"] # Specify build system dependencies
+build-backend = "setuptools.build_meta"
+backend-path = ["."] # Ensure setuptools can find its build backend
+
+[project]
+name = "poe-ninja-client" # Replace with your desired package name on PyPI
+version = "0.1.1" # Corresponds to __version__ in __init__.py
+authors = [
+  { name="infernumx", email="infernumx@protonmail.com" },
+]
+description = "A Python client for the poe.ninja API, providing access to Path of Exile economy data."
+readme = "README.md" # Path to your README file
+requires-python = ">=3.12" # Minimum Python version
+license = { file = "LICENSE" } # Or { text = "MIT License" }
+keywords = ["poe", "pathofexile", "poe.ninja", "api", "client", "wrapper", "economy"]
+
+# Classifiers help users find your project
+# Full list: https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 3 - Alpha", # Or "4 - Beta", "5 - Production/Stable"
+    "Intended Audience :: Developers",
+    "Topic :: Games/Entertainment",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "requests>=2.25.0", # Specify your project's dependencies
+    # Add other dependencies here, e.g., "pydantic>=2.0" if you use it for models
+]
+
+[project.urls] # Optional: Links related to your project
+"Homepage" = "https://github.com/infernumx/poe_ninja_client" # Replace with your repo URL
+"Bug Tracker" = "https://github.com/infernumx/poe_ninja_client/issues" # Replace
+# "Documentation" = "https://github.com/infernumx/poe_ninja_client"
+
+# Optional: Entry points, e.g., for command-line scripts
+# [project.scripts]
+# poe-ninja-cli = "poe_ninja_client.cli:main" # Example if you add a CLI
+
+# Optional: Setuptools-specific configurations if not covered by `project` table
+# [tool.setuptools]
+# package-dir = {"" = "src"} # If your package is in a src directory
+# packages = ["poe_ninja_client"] # Or find packages automatically
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Root directory of the project (where poe_ninja_client package is)
+include = ["poe_ninja_client*"]  # Include the main package and any subpackages
+exclude = ["tests*"]  # Exclude tests from the build
+
+# Example for a linter like Ruff (optional, but good practice)
+# [tool.ruff]
+# line-length = 88
+# select = ["E", "W", "F", "I", "UP", "C4", "B", "A", "RUF"] # Common checks
+# ignore = []
+
+# Example for a formatter like Black (optional)
+# [tool.black]
+# line-length = 88
+# target-version = ['py312']
