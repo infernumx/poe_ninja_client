@@ -214,8 +214,6 @@ Located in `poe_ninja_client.enums`:
 * **`CurrencyType(str, Enum)`**: Defines valid types for currency overviews and currency history (e.g., `CURRENCY`, `FRAGMENT`, `OIL`, `SCARAB`).
 * **`ItemType(str, Enum)`**: Defines valid types for item overviews and item history (e.g., `UNIQUE_WEAPON`, `UNIQUE_ARMOUR`, `SKILL_GEM`, `DIVINATION_CARD`, `MAP`).
 
-*(Note: The Enum lists in `enums.py` aim to be comprehensive but should be verified against poe.ninja's current API capabilities for all supported types.)*
-
 ### Data Models
 
 The client returns data parsed into dataclasses, defined in `poe_ninja_client.models`. Key models include:
