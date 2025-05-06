@@ -30,9 +30,9 @@ Currently, the project is under development. To install it locally for developme
 
 1.  Clone the repository:
     ```bash
-    git clone https://your-repository-url/poe_ninja_project.git 
+    git clone https://github.com/infernumx/poe_ninja_client/poe_ninja_client.git 
     # Replace with your actual repository URL
-    cd poe_ninja_project
+    cd poe_ninja_client
     ```
 2.  Create and activate a virtual environment (recommended):
     ```bash
