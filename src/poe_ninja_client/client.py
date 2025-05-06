@@ -8,14 +8,16 @@ type JsonList = list[JsonObject]
 type QueryParams = Optional[dict[str, Any]]
 
 from .exceptions import PoeNinjaAPIError, PoeNinjaRequestError
-from .enums import CurrencyType, ItemType  # GraphId removed
+from .enums import CurrencyType, ItemType  # GraphId removed as it's not used
 from .models import (
     CurrencyOverviewResponse,
     parse_currency_overview_response,
     ItemOverviewResponse,
     parse_item_overview_response,
-    HistoryResponse,
-    parse_history_response,
+    CurrencyHistoryResponse,
+    parse_currency_history_response,  # Updated model and parser
+    ItemHistoryResponse,
+    parse_item_history_response,  # New model and parser for item history
     CurrencyLine,
     ItemLine,
     CurrencyDetail,
@@ -32,7 +34,7 @@ class PoENinja:
     BASE_URL: str = "https://poe.ninja/api/data"
 
     def __init__(
-        self, league: str, user_agent: str = "Python PoENinjaClient/1.0.3"
+        self, league: str, user_agent: str = "Python PoENinjaClient/1.0.4"
     ):  # Version bump
         """
         Initializes the PoENinja client for a specific league.
@@ -105,7 +107,6 @@ class PoENinja:
     def find_currency_line(
         self, name: str, currency_type: CurrencyType
     ) -> Optional[CurrencyLine]:
-        """Finds a currency by name from the overview lines."""
         overview = self.get_currency_overview(currency_type=currency_type)
         name_lower = name.lower()
         for line in overview.lines:
@@ -113,10 +114,7 @@ class PoENinja:
                 return line
         return None
 
-    def find_item_line(
-        self, name: str, item_type: ItemType
-    ) -> Optional[ItemLine]:  # Renamed for clarity
-        """Finds an item by name from the overview lines."""
+    def find_item_line(self, name: str, item_type: ItemType) -> Optional[ItemLine]:
         overview = self.get_item_overview(item_type=item_type)
         name_lower = name.lower()
         for line in overview.lines:
@@ -128,10 +126,6 @@ class PoENinja:
     def get_currency_id_by_name(
         self, currency_name: str, overview_type: CurrencyType = CurrencyType.CURRENCY
     ) -> Optional[int]:
-        """
-        Retrieves the numeric ID of a currency by its name from the 'currencyDetails' list.
-        This ID is used for the 'currencyId' parameter in the currencyhistory API endpoint.
-        """
         overview_data = self.get_currency_overview(currency_type=overview_type)
         name_lower = currency_name.lower()
         for detail in overview_data.currencyDetails:
@@ -140,21 +134,17 @@ class PoENinja:
         return None
 
     def get_item_id_by_name(self, item_name: str, item_type: ItemType) -> Optional[int]:
-        """
-        Retrieves the numeric ID of an item by its name from the item overview lines.
-        This ID is used for the 'itemId' parameter in the itemhistory API endpoint.
-        """
         overview_data = self.get_item_overview(item_type=item_type)
         name_lower = item_name.lower()
-        for line in overview_data.lines:  # The numeric ID is in ItemLine.id
+        for line in overview_data.lines:
             if line.name.lower() == name_lower:
                 return line.id
         return None
 
-    # --- History Endpoints (Corrected based on user feedback) ---
+    # --- History Endpoints (Corrected) ---
     def get_currency_history(
         self, currency_type_for_history: CurrencyType, currency_id: int
-    ) -> HistoryResponse:
+    ) -> CurrencyHistoryResponse:
         """
         Fetches historical price data for a specific currency.
         API endpoint: /currencyhistory?league={league}&type={currency_type}&currencyId={numeric_currency_id}
@@ -165,7 +155,8 @@ class PoENinja:
             currency_id (int): The numeric ID of the currency (obtained via get_currency_id_by_name).
 
         Returns:
-            HistoryResponse: A structured object containing historical data.
+            CurrencyHistoryResponse: A structured object containing historical data, including
+                                     'receive_currency_graph_data' and 'pay_currency_graph_data'.
         """
         params: dict[str, Any] = {
             "league": self.league,
@@ -173,15 +164,15 @@ class PoENinja:
             "currencyId": str(currency_id),
         }
         raw_data: Any = self._request("currencyhistory", params=params)
-        if not isinstance(raw_data, list):
+        if not isinstance(raw_data, dict):  # Expecting a dict now for currency history
             raise PoeNinjaAPIError(
-                f"Expected JSON list for currency history data, got {type(raw_data)}"
+                f"Expected JSON object for currency history data, got {type(raw_data)}"
             )
-        return parse_history_response(cast(JsonList, raw_data))
+        return parse_currency_history_response(cast(JsonObject, raw_data))
 
     def get_item_history(
         self, item_type_for_history: ItemType, item_id: int
-    ) -> HistoryResponse:
+    ) -> ItemHistoryResponse:  # Changed to ItemHistoryResponse
         """
         Fetches historical price data for a specific item.
         API endpoint: /itemhistory?league={league}&type={item_type}&itemId={numeric_item_id}
@@ -192,19 +183,22 @@ class PoENinja:
             item_id (int): The numeric ID of the item (obtained via get_item_id_by_name).
 
         Returns:
-            HistoryResponse: A structured object containing historical data.
+            ItemHistoryResponse: A structured object containing historical data.
+                                 (Currently assumes a simple list of data points from API).
         """
         params: dict[str, Any] = {
             "league": self.league,
             "type": item_type_for_history.value,
-            "itemId": str(item_id),  # API expects itemId as string
+            "itemId": str(item_id),
         }
         raw_data: Any = self._request("itemhistory", params=params)
-        if not isinstance(raw_data, list):
+        if not isinstance(
+            raw_data, list
+        ):  # itemhistory still assumed to return a list directly
             raise PoeNinjaAPIError(
                 f"Expected JSON list for item history data, got {type(raw_data)}"
             )
-        return parse_history_response(cast(JsonList, raw_data))
+        return parse_item_history_response(cast(JsonList, raw_data))
 
     def close(self) -> None:
         self.session.close()

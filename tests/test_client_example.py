@@ -16,8 +16,9 @@ try:
         PoeNinjaAPIError,
         CurrencyOverviewResponse,
         ItemOverviewResponse,
-        HistoryResponse,
-        PoeNinjaHistoryDataPoint,
+        CurrencyHistoryResponse,
+        ItemHistoryResponse,
+        PoeNinjaHistoryDataPoint,  # Updated imports
         ItemLine,
         CurrencyLine,
         CurrencyDetail,
@@ -42,17 +43,11 @@ def run_example():
 
         with PoENinja(league=current_league) as client:
             # --- Currency Overview Example ---
-            fragment_type = CurrencyType.FRAGMENT
-            print(
-                f"\nFetching '{fragment_type.value}' type data for {client.league} league..."
-            )
-            # ... (rest of overview examples can remain similar) ...
+            # ... (overview examples can remain similar) ...
 
-            # --- Corrected History Endpoint Example (Divine Orb) ---
+            # --- Corrected Currency History Endpoint Example (Divine Orb) ---
             currency_name_for_history = "Divine Orb"
-            currency_type_for_history_lookup = (
-                CurrencyType.CURRENCY
-            )  # Type used to find the ID
+            currency_type_for_history_lookup = CurrencyType.CURRENCY
 
             print(
                 f"\nFetching numeric ID for '{currency_name_for_history}' using type '{currency_type_for_history_lookup.value}'..."
@@ -67,39 +62,51 @@ def run_example():
                     f"Found numeric ID for {currency_name_for_history}: {divine_orb_numeric_id}"
                 )
                 print(
-                    f"Fetching history for '{currency_name_for_history}' (ID: {divine_orb_numeric_id}, Type: {currency_type_for_history_lookup.value}) in {client.league} league..."
+                    f"Fetching history for '{currency_name_for_history}' (ID: {divine_orb_numeric_id}, Type: {currency_type_for_history_lookup.value})..."
                 )
                 try:
-                    divine_history: HistoryResponse = client.get_currency_history(
-                        currency_type_for_history=currency_type_for_history_lookup,  # Pass the CurrencyType Enum member
-                        currency_id=divine_orb_numeric_id,
+                    divine_history: CurrencyHistoryResponse = (
+                        client.get_currency_history(  # Now CurrencyHistoryResponse
+                            currency_type_for_history=currency_type_for_history_lookup,
+                            currency_id=divine_orb_numeric_id,
+                        )
                     )
                     print(
-                        f"  Found {len(divine_history.data_points)} historical data points for {currency_name_for_history}."
+                        f"  Found {len(divine_history.receive_currency_graph_data)} 'receive' data points for {currency_name_for_history}."
                     )
-                    if divine_history.data_points:
-                        latest_point = divine_history.data_points[0]
-                        print(
-                            f"  Latest point: {latest_point.daysAgo} days ago, value: {latest_point.value}"
+                    if divine_history.receive_currency_graph_data:
+                        latest_receive_point = (
+                            divine_history.receive_currency_graph_data[0]
                         )
+                        print(
+                            f"    Latest 'receive' point: {latest_receive_point.daysAgo} days ago, value: {latest_receive_point.value}"
+                        )
+
+                    print(
+                        f"  Found {len(divine_history.pay_currency_graph_data)} 'pay' data points for {currency_name_for_history}."
+                    )
+                    if divine_history.pay_currency_graph_data:
+                        latest_pay_point = divine_history.pay_currency_graph_data[0]
+                        print(
+                            f"    Latest 'pay' point: {latest_pay_point.daysAgo} days ago, value: {latest_pay_point.value}"
+                        )
+
                 except PoeNinjaAPIError as e:
                     print(
-                        f"  Could not fetch history for {currency_name_for_history}: {e}"
+                        f"  Could not fetch currency history for {currency_name_for_history}: {e}"
                     )
                 except Exception as einner:
                     print(
-                        f"  An unexpected error occurred fetching {currency_name_for_history} history: {einner}"
+                        f"  An unexpected error occurred fetching {currency_name_for_history} currency history: {einner}"
                     )
             else:
                 print(
-                    f"Could not find numeric ID for '{currency_name_for_history}'. Cannot fetch history."
+                    f"Could not find numeric ID for '{currency_name_for_history}'. Cannot fetch currency history."
                 )
 
-            # --- Corrected History Endpoint Example (The Squire Item History) ---
+            # --- Corrected Item History Endpoint Example (The Squire) ---
             item_name_for_history = "The Squire"
-            item_type_for_history_lookup = (
-                ItemType.UNIQUE_ARMOUR
-            )  # Type used to find the ID
+            item_type_for_history_lookup = ItemType.UNIQUE_ARMOUR
 
             print(
                 f"\nFetching numeric ID for '{item_name_for_history}' using type '{item_type_for_history_lookup.value}'..."
@@ -113,12 +120,14 @@ def run_example():
                     f"Found numeric ID for {item_name_for_history}: {squire_numeric_id}"
                 )
                 print(
-                    f"Fetching history for '{item_name_for_history}' (ID: {squire_numeric_id}, Type: {item_type_for_history_lookup.value}) in {client.league} league..."
+                    f"Fetching history for '{item_name_for_history}' (ID: {squire_numeric_id}, Type: {item_type_for_history_lookup.value})..."
                 )
                 try:
-                    squire_history: HistoryResponse = client.get_item_history(
-                        item_type_for_history=item_type_for_history_lookup,  # Pass the ItemType Enum member
-                        item_id=squire_numeric_id,
+                    squire_history: ItemHistoryResponse = (
+                        client.get_item_history(  # Uses ItemHistoryResponse
+                            item_type_for_history=item_type_for_history_lookup,
+                            item_id=squire_numeric_id,
+                        )
                     )
                     print(
                         f"  Found {len(squire_history.data_points)} historical data points for {item_name_for_history}."
@@ -128,14 +137,16 @@ def run_example():
                             f"  Example point: {squire_history.data_points[0].daysAgo} days ago, value: {squire_history.data_points[0].value}"
                         )
                 except PoeNinjaAPIError as e:
-                    print(f"  Could not fetch history for {item_name_for_history}: {e}")
+                    print(
+                        f"  Could not fetch item history for {item_name_for_history}: {e}"
+                    )
                 except Exception as einner:
                     print(
-                        f"  An unexpected error occurred fetching {item_name_for_history} history: {einner}"
+                        f"  An unexpected error occurred fetching {item_name_for_history} item history: {einner}"
                     )
             else:
                 print(
-                    f"Could not find numeric ID for '{item_name_for_history}'. Cannot fetch history."
+                    f"Could not find numeric ID for '{item_name_for_history}'. Cannot fetch item history."
                 )
 
         print("\n--- Example Run Finished ---")

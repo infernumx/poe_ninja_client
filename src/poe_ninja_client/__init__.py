@@ -17,7 +17,8 @@ from .models import (
     ItemLine,
     ItemOverviewResponse,
     PoeNinjaHistoryDataPoint,
-    HistoryResponse,
+    CurrencyHistoryResponse,
+    ItemHistoryResponse,  # Updated History models
     JsonObject,
 )
 
@@ -40,8 +41,9 @@ __all__ = [
     "ItemLine",
     "ItemOverviewResponse",
     "PoeNinjaHistoryDataPoint",
-    "HistoryResponse",
+    "CurrencyHistoryResponse",
+    "ItemHistoryResponse",
     "JsonObject",
 ]
 
-__version__ = "1.0.3"  # Version bump for API correction
+__version__ = "1.0.4"  # Version bump for API correction

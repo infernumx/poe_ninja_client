@@ -1,6 +1,6 @@
 # src/poe_ninja_client/models.py
 from dataclasses import dataclass, field
-from typing import Any, Optional, List
+from typing import Any, Optional, List, cast
 
 # Type alias for raw JSON objects when structure is not fully defined or varies
 type JsonObject = dict[str, Any]
@@ -42,7 +42,7 @@ class CurrencyLine:
 
 
 @dataclass(frozen=True)
-class CurrencyDetail:  # New dataclass for items in currencyDetails array
+class CurrencyDetail:
     """Represents a currency item listed in the currencyDetails part of an overview."""
 
     id: int  # Numeric ID, used for currencyhistory typeId
@@ -54,7 +54,7 @@ class CurrencyDetail:  # New dataclass for items in currencyDetails array
 @dataclass(frozen=True)
 class CurrencyOverviewResponse:
     lines: list[CurrencyLine]
-    currencyDetails: list[CurrencyDetail]  # Changed from list[JsonObject]
+    currencyDetails: list[CurrencyDetail]
 
 
 # --- Item Overview Models ---
@@ -98,7 +98,7 @@ class ItemOverviewResponse:
     lines: list[ItemLine]
 
 
-# --- History Endpoint Models ---
+# --- History Endpoint Models (Refined for Currency History) ---
 @dataclass(frozen=True)
 class PoeNinjaHistoryDataPoint:
     daysAgo: int
@@ -106,7 +106,29 @@ class PoeNinjaHistoryDataPoint:
 
 
 @dataclass(frozen=True)
-class HistoryResponse:
+class CurrencyHistoryResponse:  # Specific to currencyhistory endpoint structure
+    """
+    Represents a structured response from the currencyhistory endpoint.
+    Contains 'pay' and 'receive' graph data.
+    """
+
+    receive_currency_graph_data: list[PoeNinjaHistoryDataPoint] = field(
+        default_factory=list
+    )
+    pay_currency_graph_data: list[PoeNinjaHistoryDataPoint] = field(
+        default_factory=list
+    )
+    # Other potential top-level fields from the response can be added here.
+
+
+@dataclass(frozen=True)
+class ItemHistoryResponse:  # For itemhistory endpoint (assuming simple list for now)
+    """
+    Represents a structured response from the itemhistory endpoint.
+    Assuming this endpoint returns a simple list of data points directly.
+    If it also returns a complex object, this model will need adjustment.
+    """
+
     data_points: list[PoeNinjaHistoryDataPoint] = field(default_factory=list)
 
 
@@ -156,11 +178,9 @@ def _parse_currency_line(data: JsonObject) -> CurrencyLine:
     )
 
 
-def _parse_currency_detail(data: JsonObject) -> CurrencyDetail:  # New parser
+def _parse_currency_detail(data: JsonObject) -> CurrencyDetail:
     return CurrencyDetail(
-        id=data.get(
-            "id", 0
-        ),  # Default to 0 if missing, though ID should always be present
+        id=data.get("id", 0),
         icon=data.get("icon"),
         name=data.get("name", "Unknown Currency Detail"),
         tradeId=data.get("tradeId"),
@@ -234,9 +254,15 @@ def parse_item_overview_response(data: JsonObject) -> ItemOverviewResponse:
     return ItemOverviewResponse(lines=parsed_lines)
 
 
-def parse_history_response(raw_history_data: list[JsonObject]) -> HistoryResponse:
+def _parse_history_data_point_list(
+    raw_data_list: Optional[JsonList],
+) -> list[PoeNinjaHistoryDataPoint]:
+    """Helper to parse a list of raw history data points."""
+    if raw_data_list is None:
+        return []
+
     parsed_data_points: list[PoeNinjaHistoryDataPoint] = []
-    for point_data in raw_history_data:
+    for point_data in raw_data_list:
         if isinstance(point_data, dict):
             days_ago = point_data.get("daysAgo")
             value = point_data.get("value")
@@ -244,4 +270,35 @@ def parse_history_response(raw_history_data: list[JsonObject]) -> HistoryRespons
                 parsed_data_points.append(
                     PoeNinjaHistoryDataPoint(daysAgo=days_ago, value=float(value))
                 )
-    return HistoryResponse(data_points=parsed_data_points)
+    return parsed_data_points
+
+
+def parse_currency_history_response(
+    raw_response_object: JsonObject,
+) -> CurrencyHistoryResponse:
+    """
+    Parses the JSON object response from the currencyhistory endpoint.
+    Expects an object with 'receiveCurrencyGraphData' and 'payCurrencyGraphData' keys,
+    each containing a list of history data points.
+    """
+    receive_data = raw_response_object.get("receiveCurrencyGraphData")
+    pay_data = raw_response_object.get("payCurrencyGraphData")
+
+    parsed_receive_data = _parse_history_data_point_list(
+        cast(Optional[JsonList], receive_data)
+    )
+    parsed_pay_data = _parse_history_data_point_list(cast(Optional[JsonList], pay_data))
+
+    return CurrencyHistoryResponse(
+        receive_currency_graph_data=parsed_receive_data,
+        pay_currency_graph_data=parsed_pay_data,
+    )
+
+
+def parse_item_history_response(raw_history_data_list: JsonList) -> ItemHistoryResponse:
+    """
+    Parses the list of raw history data points from the itemhistory endpoint.
+    Assuming itemhistory returns a simple list of data points.
+    """
+    parsed_data_points = _parse_history_data_point_list(raw_history_data_list)
+    return ItemHistoryResponse(data_points=parsed_data_points)
