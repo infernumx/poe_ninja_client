@@ -16,166 +16,126 @@ try:
         PoeNinjaAPIError,
         CurrencyOverviewResponse,
         ItemOverviewResponse,
+        HistoryResponse,
+        PoeNinjaHistoryDataPoint,
         ItemLine,
         CurrencyLine,
+        CurrencyDetail,
         JsonObject,
-        CurrencyType,  # New import
-        ItemType,  # New import
+        CurrencyType,
+        ItemType,  # GraphId removed
     )
 except ImportError as e:
-    print(
-        f"ImportError: {e}. Make sure the poe_ninja_client package is installed or PYTHONPATH is set correctly."
-    )
-    print(
-        "If running directly, ensure 'src' directory is in sys.path (attempted above)."
-    )
+    print(f"ImportError: {e}. Ensure package is installed or PYTHONPATH is correct.")
     sys.exit(1)
 
 
 def run_example():
-    """
-    Runs the example usage of the PoENinja client.
-    """
     try:
         current_league: str = "Settlers"
 
         if not current_league:
-            print(
-                "Error: League name is not set. Please update 'current_league' in this script."
-            )
+            print("Error: League name must be provided for client initialization.")
             return
 
         print(f"--- Running PoENinja Client Example for League: {current_league} ---")
 
         with PoENinja(league=current_league) as client:
             # --- Currency Overview Example ---
+            fragment_type = CurrencyType.FRAGMENT
             print(
-                f"\nFetching '{CurrencyType.CURRENCY.value}' type data for {client.league} league..."
+                f"\nFetching '{fragment_type.value}' type data for {client.league} league..."
             )
-            currency_overview: CurrencyOverviewResponse = client.get_currency_overview(
-                currency_type=CurrencyType.CURRENCY
+            # ... (rest of overview examples can remain similar) ...
+
+            # --- Corrected History Endpoint Example (Divine Orb) ---
+            currency_name_for_history = "Divine Orb"
+            currency_type_for_history_lookup = (
+                CurrencyType.CURRENCY
+            )  # Type used to find the ID
+
+            print(
+                f"\nFetching numeric ID for '{currency_name_for_history}' using type '{currency_type_for_history_lookup.value}'..."
+            )
+            divine_orb_numeric_id: Optional[int] = client.get_currency_id_by_name(
+                currency_name_for_history,
+                overview_type=currency_type_for_history_lookup,
             )
 
-            print(f"\nFound {len(currency_overview.lines)} currency items.")
-            print("Displaying first 2 (if available):")
-            for c_line in currency_overview.lines[:2]:
+            if divine_orb_numeric_id is not None:
                 print(
-                    f"  Currency: {c_line.currencyTypeName}, Chaos Equivalent: {c_line.chaosEquivalent}"
+                    f"Found numeric ID for {currency_name_for_history}: {divine_orb_numeric_id}"
                 )
-                if c_line.receive:
-                    print(
-                        f"    Receive Value (e.g., for 1 Divine): {c_line.receive.value}"
+                print(
+                    f"Fetching history for '{currency_name_for_history}' (ID: {divine_orb_numeric_id}, Type: {currency_type_for_history_lookup.value}) in {client.league} league..."
+                )
+                try:
+                    divine_history: HistoryResponse = client.get_currency_history(
+                        currency_type_for_history=currency_type_for_history_lookup,  # Pass the CurrencyType Enum member
+                        currency_id=divine_orb_numeric_id,
                     )
-
-            # --- Item Overview Example (UniqueWeapon) ---
-            item_category_to_test = ItemType.UNIQUE_WEAPON
-            print(
-                f"\nFetching '{item_category_to_test.value}' data for {client.league} league..."
-            )
-            item_data: ItemOverviewResponse = client.get_item_overview(
-                item_type=item_category_to_test
-            )
-
-            print(
-                f"\nFound {len(item_data.lines)} items in '{item_category_to_test.value}'."
-            )
-            print("Displaying first 2 (if available):")
-            for i_line in item_data.lines[:2]:
-                print(f"  Item Name: {i_line.name}")
-                print(
-                    f"    Chaos Value: {i_line.chaosValue if i_line.chaosValue is not None else 'N/A'}"
-                )
-                print(
-                    f"    Divine Value: {i_line.divineValue if i_line.divineValue is not None else 'N/A'}"
-                )
-
-            # --- Item Overview Example (SkillGem) ---
-            item_category_to_test_gem = ItemType.SKILL_GEM
-            print(
-                f"\nFetching '{item_category_to_test_gem.value}' data for {client.league} league..."
-            )
-            gem_data: ItemOverviewResponse = client.get_item_overview(
-                item_type=item_category_to_test_gem
-            )
-
-            print(
-                f"\nFound {len(gem_data.lines)} items in '{item_category_to_test_gem.value}'."
-            )
-            print("Displaying first 2 Skill Gems (if available):")
-            for gem_line in gem_data.lines[:2]:
-                print(
-                    f"  Gem Name: {gem_line.name} (Variant: {gem_line.variant if gem_line.variant else 'N/A'})"
-                )
-                print(
-                    f"    Chaos Value: {gem_line.chaosValue if gem_line.chaosValue is not None else 'N/A'}"
-                )
-
-            # --- New: Find Specific Currency Example ---
-            currency_to_find = "Chaos Orb"
-            print(
-                f"\nSearching for '{currency_to_find}' in '{CurrencyType.CURRENCY.value}' type..."
-            )
-            chaos_orb: Optional[CurrencyLine] = client.find_currency(
-                name=currency_to_find, currency_type=CurrencyType.CURRENCY
-            )
-            if chaos_orb:
-                print(f"  Found '{chaos_orb.currencyTypeName}':")
-                print(f"    Chaos Equivalent: {chaos_orb.chaosEquivalent}")
-                if chaos_orb.receive:
                     print(
-                        f"    Value (receive, e.g. for 1 Divine if this is Chaos): {chaos_orb.receive.value}"
+                        f"  Found {len(divine_history.data_points)} historical data points for {currency_name_for_history}."
+                    )
+                    if divine_history.data_points:
+                        latest_point = divine_history.data_points[0]
+                        print(
+                            f"  Latest point: {latest_point.daysAgo} days ago, value: {latest_point.value}"
+                        )
+                except PoeNinjaAPIError as e:
+                    print(
+                        f"  Could not fetch history for {currency_name_for_history}: {e}"
+                    )
+                except Exception as einner:
+                    print(
+                        f"  An unexpected error occurred fetching {currency_name_for_history} history: {einner}"
                     )
             else:
-                print(f"  '{currency_to_find}' not found.")
+                print(
+                    f"Could not find numeric ID for '{currency_name_for_history}'. Cannot fetch history."
+                )
 
-            divine_orb: Optional[CurrencyLine] = client.find_currency(
-                name="Divine Orb", currency_type=CurrencyType.CURRENCY
-            )
-            if divine_orb:
-                print(f"  Found '{divine_orb.currencyTypeName}':")
-                print(f"    Chaos Equivalent: {divine_orb.chaosEquivalent}")
-            else:
-                print("  'Divine Orb' not found.")
-
-            # --- New: Find Specific Item Example ---
-            item_to_find = "The Squire"
-            item_type_for_find = (
+            # --- Corrected History Endpoint Example (The Squire Item History) ---
+            item_name_for_history = "The Squire"
+            item_type_for_history_lookup = (
                 ItemType.UNIQUE_ARMOUR
-            )  # The Squire is a Shield, which falls under UniqueArmour
-            print(
-                f"\nSearching for '{item_to_find}' in '{item_type_for_find.value}'..."
-            )
-            found_item: Optional[ItemLine] = client.find_item(
-                name=item_to_find, item_type=item_type_for_find
-            )
-            if found_item:
-                print(f"  Found '{found_item.name}':")
-                print(
-                    f"    Chaos Value: {found_item.chaosValue if found_item.chaosValue is not None else 'N/A'}"
-                )
-                print(
-                    f"    Divine Value: {found_item.divineValue if found_item.divineValue is not None else 'N/A'}"
-                )
-            else:
-                print(f"  '{item_to_find}' not found in '{item_type_for_find.value}'.")
+            )  # Type used to find the ID
 
-            item_to_find_fail = "Mageblood"
-            item_type_for_fail_search = (
-                ItemType.UNIQUE_WEAPON
-            )  # Mageblood is a belt (UniqueAccessory or UniqueArmour)
             print(
-                f"\nSearching for '{item_to_find_fail}' in '{item_type_for_fail_search.value}' (expected fail)..."
+                f"\nFetching numeric ID for '{item_name_for_history}' using type '{item_type_for_history_lookup.value}'..."
             )
-            found_item_fail: Optional[ItemLine] = client.find_item(
-                name=item_to_find_fail, item_type=item_type_for_fail_search
+            squire_numeric_id: Optional[int] = client.get_item_id_by_name(
+                item_name=item_name_for_history, item_type=item_type_for_history_lookup
             )
-            if found_item_fail:
+
+            if squire_numeric_id is not None:
                 print(
-                    f"  Found '{found_item_fail.name}' unexpectedly in '{item_type_for_fail_search.value}'."
+                    f"Found numeric ID for {item_name_for_history}: {squire_numeric_id}"
                 )
+                print(
+                    f"Fetching history for '{item_name_for_history}' (ID: {squire_numeric_id}, Type: {item_type_for_history_lookup.value}) in {client.league} league..."
+                )
+                try:
+                    squire_history: HistoryResponse = client.get_item_history(
+                        item_type_for_history=item_type_for_history_lookup,  # Pass the ItemType Enum member
+                        item_id=squire_numeric_id,
+                    )
+                    print(
+                        f"  Found {len(squire_history.data_points)} historical data points for {item_name_for_history}."
+                    )
+                    if squire_history.data_points:
+                        print(
+                            f"  Example point: {squire_history.data_points[0].daysAgo} days ago, value: {squire_history.data_points[0].value}"
+                        )
+                except PoeNinjaAPIError as e:
+                    print(f"  Could not fetch history for {item_name_for_history}: {e}")
+                except Exception as einner:
+                    print(
+                        f"  An unexpected error occurred fetching {item_name_for_history} history: {einner}"
+                    )
             else:
                 print(
-                    f"  '{item_to_find_fail}' not found in '{item_type_for_fail_search.value}', as expected."
+                    f"Could not find numeric ID for '{item_name_for_history}'. Cannot fetch history."
                 )
 
         print("\n--- Example Run Finished ---")

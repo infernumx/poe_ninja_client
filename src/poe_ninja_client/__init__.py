@@ -2,19 +2,22 @@
 
 from .client import PoENinja
 from .exceptions import PoeNinjaError, PoeNinjaRequestError, PoeNinjaAPIError
-
-# Expose Enums
-from .enums import CurrencyType, ItemType
-
-# Expose models for type hinting and direct use by library consumers
+from .enums import (
+    CurrencyType,
+    ItemType,
+    # GraphId removed
+)
 from .models import (
     SparkLineData,
     CurrencyTradeData,
     CurrencyLine,
     CurrencyOverviewResponse,
+    CurrencyDetail,
     ItemSparkLine,
     ItemLine,
     ItemOverviewResponse,
+    PoeNinjaHistoryDataPoint,
+    HistoryResponse,
     JsonObject,
 )
 
@@ -32,10 +35,13 @@ __all__ = [
     "CurrencyTradeData",
     "CurrencyLine",
     "CurrencyOverviewResponse",
+    "CurrencyDetail",
     "ItemSparkLine",
     "ItemLine",
     "ItemOverviewResponse",
+    "PoeNinjaHistoryDataPoint",
+    "HistoryResponse",
     "JsonObject",
 ]
 
-__version__ = "0.5.0"  # Version bump
+__version__ = "1.0.3"  # Version bump for API correction

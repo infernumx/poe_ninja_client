@@ -1,71 +1,60 @@
 # src/poe_ninja_client/client.py
 
 import requests
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-# Type aliases for better readability using Python 3.12 `type` keyword
 type JsonObject = dict[str, Any]
+type JsonList = list[JsonObject]
 type QueryParams = Optional[dict[str, Any]]
 
 from .exceptions import PoeNinjaAPIError, PoeNinjaRequestError
-from .enums import CurrencyType, ItemType  # New import for Enums
+from .enums import CurrencyType, ItemType  # GraphId removed
 from .models import (
     CurrencyOverviewResponse,
     parse_currency_overview_response,
     ItemOverviewResponse,
     parse_item_overview_response,
+    HistoryResponse,
+    parse_history_response,
     CurrencyLine,
     ItemLine,
+    CurrencyDetail,
 )
 
 
 class PoENinja:
     """
     A Python client for interacting with the poe.ninja API.
-    The league is set during initialization.
+    The league is set during initialization and is required for all data fetching methods.
     Strictly typed for Python 3.12+.
     """
 
     BASE_URL: str = "https://poe.ninja/api/data"
 
     def __init__(
-        self, league: str, user_agent: str = "Python PoENinjaClient/0.5.0"
+        self, league: str, user_agent: str = "Python PoENinjaClient/1.0.3"
     ):  # Version bump
         """
         Initializes the PoENinja client for a specific league.
 
         Args:
-            league (str): The Path of Exile league to query (e.g., "Necropolis").
+            league (str): The Path of Exile league to query. This is mandatory.
             user_agent (str): A User-Agent string for HTTP requests.
         """
         if not league:
-            raise ValueError("League cannot be empty.")
+            raise ValueError(
+                "A league name must be provided for client initialization."
+            )
         self.league: str = league
         self.session: requests.Session = requests.Session()
         self.session.headers.update({"User-Agent": user_agent})
 
-    def _request(self, endpoint: str, params: QueryParams = None) -> JsonObject:
-        """
-        Makes a GET request to the specified poe.ninja API endpoint.
-        Internal method, returns raw JSON object.
-
-        Args:
-            endpoint (str): The API endpoint to call (e.g., "currencyoverview").
-            params (QueryParams): A dictionary of query parameters.
-
-        Returns:
-            JsonObject: The JSON response from the API.
-
-        Raises:
-            PoeNinjaRequestError: If there's a network issue or non-200 status code.
-            PoeNinjaAPIError: If the API returns an error message or unexpected format.
-        """
+    def _request(self, endpoint: str, params: QueryParams = None) -> Any:
         actual_params: dict[str, Any] = params if params is not None else {}
         url: str = f"{self.BASE_URL}/{endpoint}"
-
         try:
             response: requests.Response = self.session.get(
-                url, params=actual_params, timeout=10
+                url, params=actual_params, timeout=15
             )
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
@@ -75,110 +64,149 @@ class PoENinja:
                     error_details = e.response.json()
                 except requests.exceptions.JSONDecodeError:
                     error_details = e.response.text
-                status_code = e.response.status_code
-                reason = e.response.reason
+                status_code, reason = e.response.status_code, e.response.reason
             else:
-                status_code = None
-                reason = "Unknown reason"
+                status_code, reason = None, "Unknown reason"
             raise PoeNinjaRequestError(
-                f"HTTP error occurred: {status_code} {reason}. Details: {error_details}",
+                f"HTTP error: {status_code} {reason}. Details: {error_details}",
                 status_code=status_code,
             ) from e
         except requests.exceptions.RequestException as e:
             raise PoeNinjaRequestError(f"Request failed: {e}") from e
-
         try:
-            data: JsonObject = response.json()
+            return response.json()
         except requests.exceptions.JSONDecodeError as e:
             raise PoeNinjaAPIError(
-                f"Failed to decode JSON response from {url}. Content: {response.text[:200]}..."
+                f"Failed to decode JSON from {url}. Content: {response.text[:200]}..."
             ) from e
-        return data
 
+    # --- Overview Endpoints ---
     def get_currency_overview(
         self, currency_type: CurrencyType
-    ) -> CurrencyOverviewResponse:  # Changed to Enum
-        """
-        Fetches currency overview data for the initialized league.
+    ) -> CurrencyOverviewResponse:
+        params: dict[str, Any] = {"league": self.league, "type": currency_type.value}
+        raw_data: Any = self._request("currencyoverview", params=params)
+        if not isinstance(raw_data, dict):
+            raise PoeNinjaAPIError(
+                f"Expected JSON object for currency overview, got {type(raw_data)}"
+            )
+        return parse_currency_overview_response(cast(JsonObject, raw_data))
 
-        Args:
-            currency_type (CurrencyType): The type of currency (e.g., CurrencyType.CURRENCY).
+    def get_item_overview(self, item_type: ItemType) -> ItemOverviewResponse:
+        params: dict[str, Any] = {"league": self.league, "type": item_type.value}
+        raw_data: Any = self._request("itemoverview", params=params)
+        if not isinstance(raw_data, dict):
+            raise PoeNinjaAPIError(
+                f"Expected JSON object for item overview, got {type(raw_data)}"
+            )
+        return parse_item_overview_response(cast(JsonObject, raw_data))
 
-        Returns:
-            CurrencyOverviewResponse: A structured object containing the currency overview data.
-        """
-        params: dict[str, Any] = {
-            "league": self.league,
-            "type": currency_type.value,  # Use Enum value
-        }
-        raw_json_response: JsonObject = self._request("currencyoverview", params=params)
-        return parse_currency_overview_response(raw_json_response)
-
-    def get_item_overview(
-        self, item_type: ItemType
-    ) -> ItemOverviewResponse:  # Changed to Enum
-        """
-        Fetches item overview data for the initialized league.
-
-        Args:
-            item_type (ItemType): The type of item (e.g., ItemType.UNIQUE_WEAPON).
-
-        Returns:
-            ItemOverviewResponse: A structured object containing the item overview data.
-        """
-        params: dict[str, Any] = {
-            "league": self.league,
-            "type": item_type.value,  # Use Enum value
-        }
-        raw_json_response: JsonObject = self._request("itemoverview", params=params)
-        return parse_item_overview_response(raw_json_response)
-
-    def find_currency(
+    # --- Find Specific Item/Currency (from overview data) ---
+    def find_currency_line(
         self, name: str, currency_type: CurrencyType
-    ) -> Optional[CurrencyLine]:  # Changed to Enum
-        """
-        Finds a specific currency by its name within a given currency type.
-        The search is case-insensitive.
-
-        Args:
-            name (str): The name of the currency to find (e.g., "Chaos Orb", "Divine Orb").
-            currency_type (CurrencyType): The type of currency (e.g., CurrencyType.CURRENCY).
-
-        Returns:
-            Optional[CurrencyLine]: The found CurrencyLine object, or None if not found.
-        """
-        overview: CurrencyOverviewResponse = self.get_currency_overview(
-            currency_type=currency_type
-        )
+    ) -> Optional[CurrencyLine]:
+        """Finds a currency by name from the overview lines."""
+        overview = self.get_currency_overview(currency_type=currency_type)
         name_lower = name.lower()
-        for currency_line in overview.lines:
-            if currency_line.currencyTypeName.lower() == name_lower:
-                return currency_line
+        for line in overview.lines:
+            if line.currencyTypeName.lower() == name_lower:
+                return line
         return None
 
-    def find_item(
+    def find_item_line(
         self, name: str, item_type: ItemType
-    ) -> Optional[ItemLine]:  # Changed to Enum
+    ) -> Optional[ItemLine]:  # Renamed for clarity
+        """Finds an item by name from the overview lines."""
+        overview = self.get_item_overview(item_type=item_type)
+        name_lower = name.lower()
+        for line in overview.lines:
+            if line.name.lower() == name_lower:
+                return line
+        return None
+
+    # --- Helpers to get Numeric IDs for History ---
+    def get_currency_id_by_name(
+        self, currency_name: str, overview_type: CurrencyType = CurrencyType.CURRENCY
+    ) -> Optional[int]:
         """
-        Finds a specific item by its name within a given item type.
-        The search is case-insensitive.
+        Retrieves the numeric ID of a currency by its name from the 'currencyDetails' list.
+        This ID is used for the 'currencyId' parameter in the currencyhistory API endpoint.
+        """
+        overview_data = self.get_currency_overview(currency_type=overview_type)
+        name_lower = currency_name.lower()
+        for detail in overview_data.currencyDetails:
+            if detail.name.lower() == name_lower:
+                return detail.id
+        return None
+
+    def get_item_id_by_name(self, item_name: str, item_type: ItemType) -> Optional[int]:
+        """
+        Retrieves the numeric ID of an item by its name from the item overview lines.
+        This ID is used for the 'itemId' parameter in the itemhistory API endpoint.
+        """
+        overview_data = self.get_item_overview(item_type=item_type)
+        name_lower = item_name.lower()
+        for line in overview_data.lines:  # The numeric ID is in ItemLine.id
+            if line.name.lower() == name_lower:
+                return line.id
+        return None
+
+    # --- History Endpoints (Corrected based on user feedback) ---
+    def get_currency_history(
+        self, currency_type_for_history: CurrencyType, currency_id: int
+    ) -> HistoryResponse:
+        """
+        Fetches historical price data for a specific currency.
+        API endpoint: /currencyhistory?league={league}&type={currency_type}&currencyId={numeric_currency_id}
 
         Args:
-            name (str): The name of the item to find (e.g., "Headhunter", "Mageblood").
-            item_type (ItemType): The type of item (e.g., ItemType.UNIQUE_ARMOUR for belts/shields).
+            currency_type_for_history (CurrencyType): The general type of the currency
+                                                      (e.g., CurrencyType.CURRENCY, CurrencyType.FRAGMENT).
+            currency_id (int): The numeric ID of the currency (obtained via get_currency_id_by_name).
 
         Returns:
-            Optional[ItemLine]: The found ItemLine object, or None if not found.
+            HistoryResponse: A structured object containing historical data.
         """
-        overview: ItemOverviewResponse = self.get_item_overview(item_type=item_type)
-        name_lower = name.lower()
-        for item_line in overview.lines:
-            if item_line.name.lower() == name_lower:
-                return item_line
-        return None
+        params: dict[str, Any] = {
+            "league": self.league,
+            "type": currency_type_for_history.value,
+            "currencyId": str(currency_id),
+        }
+        raw_data: Any = self._request("currencyhistory", params=params)
+        if not isinstance(raw_data, list):
+            raise PoeNinjaAPIError(
+                f"Expected JSON list for currency history data, got {type(raw_data)}"
+            )
+        return parse_history_response(cast(JsonList, raw_data))
+
+    def get_item_history(
+        self, item_type_for_history: ItemType, item_id: int
+    ) -> HistoryResponse:
+        """
+        Fetches historical price data for a specific item.
+        API endpoint: /itemhistory?league={league}&type={item_type}&itemId={numeric_item_id}
+
+        Args:
+            item_type_for_history (ItemType): The general type of the item
+                                              (e.g., ItemType.UNIQUE_JEWEL, ItemType.UNIQUE_ARMOUR).
+            item_id (int): The numeric ID of the item (obtained via get_item_id_by_name).
+
+        Returns:
+            HistoryResponse: A structured object containing historical data.
+        """
+        params: dict[str, Any] = {
+            "league": self.league,
+            "type": item_type_for_history.value,
+            "itemId": str(item_id),  # API expects itemId as string
+        }
+        raw_data: Any = self._request("itemhistory", params=params)
+        if not isinstance(raw_data, list):
+            raise PoeNinjaAPIError(
+                f"Expected JSON list for item history data, got {type(raw_data)}"
+            )
+        return parse_history_response(cast(JsonList, raw_data))
 
     def close(self) -> None:
-        """Closes the underlying requests session."""
         self.session.close()
 
     def __enter__(self) -> "PoENinja":

@@ -1,33 +1,22 @@
 # src/poe_ninja_client/models.py
 from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Optional,
-    List,
-)  # List will be list with Python 3.9+ built-in generics
+from typing import Any, Optional, List
 
 # Type alias for raw JSON objects when structure is not fully defined or varies
 type JsonObject = dict[str, Any]
+type JsonList = list[JsonObject]
 
 
-# --- Currency Overview Models (from previous step) ---
+# --- Currency Overview Models ---
 @dataclass(frozen=True)
 class SparkLineData:
-    """
-    Represents the sparkline data for currency trends.
-    """
-
     data: list[float | int] = field(default_factory=list)
     totalChange: float = 0.0
 
 
 @dataclass(frozen=True)
 class CurrencyTradeData:
-    """
-    Represents the pay or receive details for a currency.
-    """
-
-    id: int  # noqa: A003 (allow 'id' as a field name)
+    id: int  # noqa: A003
     league_id: int
     pay_currency_id: int
     get_currency_id: int
@@ -41,10 +30,6 @@ class CurrencyTradeData:
 
 @dataclass(frozen=True)
 class CurrencyLine:
-    """
-    Represents a single currency entry in the overview.
-    """
-
     currencyTypeName: str
     pay: Optional[CurrencyTradeData]
     receive: Optional[CurrencyTradeData]
@@ -53,90 +38,80 @@ class CurrencyLine:
     chaosEquivalent: float
     lowConfidencePaySparkLine: SparkLineData
     lowConfidenceReceiveSparkLine: SparkLineData
-    detailsId: str
+    detailsId: str  # This is the string ID like "chaos-orb", "divine-orb"
+
+
+@dataclass(frozen=True)
+class CurrencyDetail:  # New dataclass for items in currencyDetails array
+    """Represents a currency item listed in the currencyDetails part of an overview."""
+
+    id: int  # Numeric ID, used for currencyhistory typeId
+    name: str
+    icon: Optional[str] = None
+    tradeId: Optional[str] = None  # String ID, e.g., "divine", "chaos"
 
 
 @dataclass(frozen=True)
 class CurrencyOverviewResponse:
-    """
-    Represents the entire response from the currency overview endpoint.
-    """
-
     lines: list[CurrencyLine]
-    currencyDetails: list[JsonObject]  # Structure can vary
+    currencyDetails: list[CurrencyDetail]  # Changed from list[JsonObject]
 
 
-# --- Item Overview Models (New) ---
-
-
+# --- Item Overview Models ---
 @dataclass(frozen=True)
-class ItemSparkLine:  # Similar to SparkLineData, but some item endpoints might have different fields
-    """
-    Represents the sparkline data for item trends.
-    """
-
-    data: list[Optional[float | int]] = field(
-        default_factory=list
-    )  # Data points can sometimes be null
+class ItemSparkLine:
+    data: list[Optional[float | int]] = field(default_factory=list)
     totalChange: float = 0.0
 
 
 @dataclass(frozen=True)
 class ItemLine:
-    """
-    Represents a single item entry in an item overview.
-    This is a generic model; specific item types might have more or fewer fields.
-    Fields are marked Optional as they may not appear for all item types.
-    """
-
     id: int  # noqa: A003
     name: str
     icon: Optional[str] = None
-    mapTier: Optional[int] = None  # For maps
+    mapTier: Optional[int] = None
     levelRequired: Optional[int] = None
     baseType: Optional[str] = None
-    stackSize: Optional[int] = None  # For stackable items like currency, fossils, etc.
-    variant: Optional[str] = None  # E.g., for skill gems with quality types
-    prophecyText: Optional[str] = None  # For prophecies
+    stackSize: Optional[int] = None
+    variant: Optional[str] = None
+    prophecyText: Optional[str] = None
     artFilename: Optional[str] = None
-    links: Optional[int] = None  # For items with links (e.g. 6-link)
-    itemClass: Optional[int] = None  # Numerical class, meaning might need mapping
+    links: Optional[int] = None
+    itemClass: Optional[int] = None
     sparkline: Optional[ItemSparkLine] = None
     lowConfidenceSparkline: Optional[ItemSparkLine] = None
-    implicitModifiers: list[JsonObject] = field(
-        default_factory=list
-    )  # Structure can vary
-    explicitModifiers: list[JsonObject] = field(
-        default_factory=list
-    )  # Structure can vary
+    implicitModifiers: list[JsonObject] = field(default_factory=list)
+    explicitModifiers: list[JsonObject] = field(default_factory=list)
     flavourText: Optional[str] = None
     corrupted: Optional[bool] = None
-    gemLevel: Optional[int] = None  # For skill gems
-    gemQuality: Optional[int] = None  # For skill gems (e.g. 20)
-    itemType: Optional[str] = None  # E.g., "Abyss Jewel"
+    gemLevel: Optional[int] = None
+    gemQuality: Optional[int] = None
+    itemType: Optional[str] = None
     chaosValue: Optional[float] = None
     divineValue: Optional[float] = None
-    count: Optional[int] = None  # Number of items listed for this price point
-    detailsId: Optional[str] = None
-    # Add other common fields as identified, e.g. exaltedValue, listingCount
+    count: Optional[int] = None
+    detailsId: Optional[str] = None  # This is the string ID used for itemhistory typeId
 
 
 @dataclass(frozen=True)
 class ItemOverviewResponse:
-    """
-    Represents the entire response from an item overview endpoint.
-    """
-
     lines: list[ItemLine]
-    # Some item endpoints might have other top-level keys, add them if needed
+
+
+# --- History Endpoint Models ---
+@dataclass(frozen=True)
+class PoeNinjaHistoryDataPoint:
+    daysAgo: int
+    value: float
+
+
+@dataclass(frozen=True)
+class HistoryResponse:
+    data_points: list[PoeNinjaHistoryDataPoint] = field(default_factory=list)
 
 
 # --- Parser Helper Functions ---
-
-
-def _parse_sparkline_data(
-    data: Optional[JsonObject],
-) -> SparkLineData:  # Renamed for clarity
+def _parse_sparkline_data(data: Optional[JsonObject]) -> SparkLineData:
     if data is None:
         return SparkLineData(data=[], totalChange=0.0)
     return SparkLineData(
@@ -181,34 +156,45 @@ def _parse_currency_line(data: JsonObject) -> CurrencyLine:
     )
 
 
+def _parse_currency_detail(data: JsonObject) -> CurrencyDetail:  # New parser
+    return CurrencyDetail(
+        id=data.get(
+            "id", 0
+        ),  # Default to 0 if missing, though ID should always be present
+        icon=data.get("icon"),
+        name=data.get("name", "Unknown Currency Detail"),
+        tradeId=data.get("tradeId"),
+    )
+
+
 def parse_currency_overview_response(data: JsonObject) -> CurrencyOverviewResponse:
     lines_data = data.get("lines", [])
     parsed_lines = [
         _parse_currency_line(line) for line in lines_data if isinstance(line, dict)
     ]
-    currency_details_data = data.get("currencyDetails", [])
+
+    currency_details_raw = data.get("currencyDetails", [])
+    parsed_currency_details = [
+        _parse_currency_detail(detail)
+        for detail in currency_details_raw
+        if isinstance(detail, dict)
+    ]
+
     return CurrencyOverviewResponse(
-        lines=parsed_lines, currencyDetails=currency_details_data
+        lines=parsed_lines, currencyDetails=parsed_currency_details
     )
-
-
-# --- Item Overview Parser (New) ---
 
 
 def _parse_item_sparkline(data: Optional[JsonObject]) -> Optional[ItemSparkLine]:
     if data is None:
         return None
     return ItemSparkLine(
-        data=[
-            val if val is not None else 0.0 for val in data.get("data", [])
-        ],  # Handle potential nulls in data
+        data=[val if val is not None else 0.0 for val in data.get("data", [])],
         totalChange=data.get("totalChange", 0.0),
     )
 
 
 def _parse_item_line(data: JsonObject) -> ItemLine:
-    # This parser is generic. For specific item types, you might need
-    # more sophisticated logic or different models.
     return ItemLine(
         id=data.get("id", 0),
         name=data.get("name", "Unknown Item"),
@@ -246,3 +232,16 @@ def parse_item_overview_response(data: JsonObject) -> ItemOverviewResponse:
         _parse_item_line(line) for line in lines_data if isinstance(line, dict)
     ]
     return ItemOverviewResponse(lines=parsed_lines)
+
+
+def parse_history_response(raw_history_data: list[JsonObject]) -> HistoryResponse:
+    parsed_data_points: list[PoeNinjaHistoryDataPoint] = []
+    for point_data in raw_history_data:
+        if isinstance(point_data, dict):
+            days_ago = point_data.get("daysAgo")
+            value = point_data.get("value")
+            if isinstance(days_ago, int) and isinstance(value, (float, int)):
+                parsed_data_points.append(
+                    PoeNinjaHistoryDataPoint(daysAgo=days_ago, value=float(value))
+                )
+    return HistoryResponse(data_points=parsed_data_points)

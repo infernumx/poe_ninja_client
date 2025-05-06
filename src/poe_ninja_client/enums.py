@@ -5,66 +5,91 @@ from enum import Enum
 class CurrencyType(str, Enum):
     """
     Enum for poe.ninja currency overview types.
-    Values correspond to the 'type' query parameter.
+    Values correspond to the 'type' query parameter for the currencyoverview endpoint
+    and the 'type' parameter for the currencyhistory endpoint.
     """
 
+    # Core Currency
     CURRENCY = "Currency"
     FRAGMENT = "Fragment"
-    # Add other types as needed, e.g., DeliriumOrb, Catalyst, Oil, Incubator, Scarab, Fossil, Essence, Resonator, Vials
-    DELIRIUM_ORB = "DeliriumOrb"
-    CATALYST = "Catalyst"
-    OIL = "Oil"
-    INCUBATOR = "Incubator"
+
+    # Map Related
     SCARAB = "Scarab"
-    FOSSIL = "Fossil"
+    DELIRIUM_ORB = "DeliriumOrb"
+    INVITATION = "Invitation"
+
+    # Crafting Currency
     ESSENCE = "Essence"
+    FOSSIL = "Fossil"
     RESONATOR = "Resonator"
+    OIL = "Oil"
+    CATALYST = "Catalyst"
     VIAL = "Vial"
-    # Add more based on https://poe.ninja/api/data/getcurrencyoverview?league=Standard&type=Fragment (explore types)
+    INCUBATOR = "Incubator"
+    OMEN = "Omen"
+    TATTOO = "Tattoo"
+    COFFIN = "Coffin"  # Itemized Corpses from Necropolis
 
 
 class ItemType(str, Enum):
     """
     Enum for poe.ninja item overview types.
-    Values correspond to the 'type' query parameter.
-    This list is not exhaustive and should be expanded based on poe.ninja's API.
+    Values correspond to the 'type' query parameter for the itemoverview endpoint
+    and the 'type' parameter for the itemhistory endpoint.
     """
 
-    # Weapons
-    UNIQUE_WEAPON = "UniqueWeapon"  # Covers 1H, 2H Axes, Maces, Swords, Bows, Claws, Daggers, Staves, Wands
-    # Armour
-    UNIQUE_ARMOUR = (
-        "UniqueArmour"  # Covers Body Armours, Boots, Gloves, Helmets, Shields
-    )
-    # Accessories
-    UNIQUE_ACCESSORY = "UniqueAccessory"  # Covers Amulets, Belts, Rings
+    # From user list & previous additions
+    UNIQUE_IDOL = "UniqueIdol"
+    KALGUURAN_RUNE = "KalguuranRune"
+    TATTOO = "Tattoo"
+    OMEN = "Omen"
+    ARTIFACT = "Artifact"
+    OIL = "Oil"
+    INCUBATOR = "Incubator"
+    UNIQUE_TINCTURE = "UniqueTincture"
+    DELIRIUM_ORB = "DeliriumOrb"
+    INVITATION = "Invitation"
+    SCARAB = "Scarab"
+    MEMORY = "Memory"
+    FOSSIL = "Fossil"
+    RESONATOR = "Resonator"
+    ESSENCE = "Essence"
+    VIAL = "Vial"
+
+    UNIQUE_WEAPON = "UniqueWeapon"
+    UNIQUE_ARMOUR = "UniqueArmour"
+    UNIQUE_ACCESSORY = "UniqueAccessory"
     UNIQUE_FLASK = "UniqueFlask"
     UNIQUE_JEWEL = "UniqueJewel"
-    ABYSS_JEWEL = "AbyssJewel"  # Might be UniqueJewel or a separate category, check API
-    CLUSTER_JEWEL = (
-        "ClusterJewel"  # Small, Medium, Large, check if distinct types needed
-    )
-
-    # Gems
-    SKILL_GEM = "SkillGem"  # Covers normal, awakened, alternate quality etc.
-    # poe.ninja might have more granular types like "AwakenedGem"
-
-    # Maps & Fragments
-    MAP = "Map"
-    BLIGHTED_MAP = "BlightedMap"  # Or just "Map" with a variant?
+    UNIQUE_RELIC = "UniqueRelic"
     UNIQUE_MAP = "UniqueMap"
-    MAP_FRAGMENT = "MapFragment"  # Often just "Fragment" in currency overview
 
-    # Other categories
-    DIVINATION_CARD = "DivinationCard"
-    BEAST = "Beast"
-    INVITATION = "Invitation"  # E.g. Maven's Invitation
-    HELMET_ENCHANT = "HelmetEnchant"
-    BASE_TYPE = "BaseType"  # For fetching base item data (e.g. ilvl 86+ bases)
+    SKILL_GEM = "SkillGem"
+    AWAKENED_GEM = "AwakenedGem"
+    TRANSFIGURED_GEM = "TransfiguredGem"
+
+    MAP = "Map"
+    BLIGHTED_MAP = "BlightedMap"
+    BLIGHT_RAVAGED_MAP = "BlightRavagedMap"
+
     WATCHSTONE = "Watchstone"
-    # Add more based on https://poe.ninja/api/data/getitemoverview?league=Standard&type=UniqueWeapon (explore types)
+
+    BASE_TYPE = "BaseType"
+    HELMET_ENCHANT = "HelmetEnchant"
+    DIVINATION_CARD = "DivinationCard"
+    ABYSS_JEWEL = "AbyssJewel"
+    CLUSTER_JEWEL = "ClusterJewel"
+    CAPTURED_BEAST = "Beast"
+    POTION = "Potion"
+
+    HEIST_CONTRACT = "Contract"
+    HEIST_BLUEPRINT = "Blueprint"
+    HEIST_TARGET = "HeistTarget"
+    HEIST_TOOL = "HeistTool"
+    HEIST_CLOAK = "HeistCloak"
+    HEIST_BROOCH = "HeistBrooch"
+    HEIST_GEAR = "HeistGear"
 
 
-# Example of how to get all values if needed:
-# ALL_CURRENCY_TYPES = [member.value for member in CurrencyType]
-# ALL_ITEM_TYPES = [member.value for member in ItemType]
+# GraphId Enum has been removed as it's not used by currencyhistory or itemhistory
+# based on the latest information.

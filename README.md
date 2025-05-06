@@ -1,22 +1,26 @@
 # PoENinja Client
 
-**PoENinja** is a Python client library for interacting with the public [poe.ninja API](https://poe.ninja/swagger/). It provides a simple, strictly-typed, and convenient interface to fetch various Path of Exile economy data for a specified league.
+**PoENinja** is a Python client library for interacting with the public [poe.ninja API](https://poe.ninja/). It provides a simple, strictly-typed, and convenient interface to fetch various Path of Exile economy data for a specified league.
 
-**Current Version:** 0.5.0
+**Current Version:** 1.0.3
 
 ## Features
 
-* **League-Specific Client:** Initialize the client for a specific Path of Exile league.
-* **Typed API Responses:** Fetched data is parsed into Pydantic-like dataclasses for easy and type-safe access.
+* **League-Specific Client:** Initialize the client for a specific Path of Exile league. All data fetching is league-dependent.
+* **Typed API Responses:** Fetched data is parsed into dataclasses for easy and type-safe access.
 * **Enum-Driven Categories:** Uses Enums (`CurrencyType`, `ItemType`) for specifying data categories, reducing errors and improving code clarity.
 * **Comprehensive Data Fetching:**
-  * `get_currency_overview(currency_type: CurrencyType)`: Fetches bulk data for specified currency types (e.g., regular currency, fragments).
-  * `get_item_overview(item_type: ItemType)`: Fetches bulk data for specified item types (e.g., unique weapons, skill gems).
-* **Targeted Search:**
-  * `find_currency(name: str, currency_type: CurrencyType)`: Quickly finds a specific currency item by name within its category.
-  * `find_item(name: str, item_type: ItemType)`: Quickly finds a specific item by name within its category.
+    * `get_currency_overview(currency_type: CurrencyType)`: Fetches bulk data for specified currency types (e.g., regular currency, fragments).
+    * `get_item_overview(item_type: ItemType)`: Fetches bulk data for specified item types (e.g., unique weapons, skill gems).
+    * `get_currency_history(currency_type_for_history: CurrencyType, currency_id: int)`: Fetches historical price data for a specific currency.
+    * `get_item_history(item_type_for_history: ItemType, item_id: int)`: Fetches historical price data for a specific item.
+* **Convenience Lookups:**
+    * `find_currency_line(name: str, currency_type: CurrencyType)`: Quickly finds a specific currency's overview data by name.
+    * `find_item_line(name: str, item_type: ItemType)`: Quickly finds a specific item's overview data by name.
+    * `get_currency_id_by_name(currency_name: str, overview_type: CurrencyType)`: Retrieves the numeric ID of a currency, needed for history lookups.
+    * `get_item_id_by_name(item_name: str, item_type: ItemType)`: Retrieves the numeric ID of an item, needed for history lookups.
 * **Session Management:** Uses `requests.Session` for efficient HTTP requests.
-* **Custom Exceptions:** Clear error handling for API and request issues.
+* **Custom Exceptions:** Clear error handling for API and request issues (`PoeNinjaRequestError`, `PoeNinjaAPIError`).
 * **Context Manager Support:** Ensures resources like the HTTP session are properly managed.
 * **Strictly Typed:** Designed for Python 3.12+ with full type hinting.
 
@@ -59,8 +63,9 @@ from poe_ninja_client import (
     ItemType,
     PoeNinjaRequestError, 
     PoeNinjaAPIError,
-    CurrencyLine, # For type hinting specific results
-    ItemLine      # For type hinting specific results
+    CurrencyLine, 
+    ItemLine,
+    HistoryResponse
 )
 from typing import Optional
 
@@ -87,56 +92,78 @@ try:
             first_armour = unique_armours.lines[0]
             print(f"Example: {first_armour.name} - Chaos Value: {first_armour.chaosValue}")
 
-        # 3. Find a specific currency: Divine Orb
-        print("\nSearching for 'Divine Orb'...")
-        divine_orb: Optional[CurrencyLine] = client.find_currency(
+        # 3. Find a specific currency's overview data: Divine Orb
+        print("\nSearching for 'Divine Orb' overview data...")
+        divine_orb_line: Optional[CurrencyLine] = client.find_currency_line(
             name="Divine Orb", 
             currency_type=CurrencyType.CURRENCY
         )
-        if divine_orb:
-            print(f"Found Divine Orb: {divine_orb.chaosEquivalent} Chaos")
-            if divine_orb.receive:
-                 # If Divine Orb is the "get_currency_id", 'value' is its price in the "pay_currency_id"
-                 # If Chaos Orb is the "pay_currency_id", this 'value' is how many Chaos Orbs for 1 Divine Orb.
-                print(f"  'receive.value' (e.g., Chaos per Divine if base is Chaos): {divine_orb.receive.value}")
+        if divine_orb_line:
+            print(f"Found Divine Orb in overview: {divine_orb_line.chaosEquivalent} Chaos")
         else:
-            print("Divine Orb not found.")
+            print("Divine Orb not found in overview.")
 
-        # 4. Find a specific item: The Squire (Unique Shield, falls under UniqueArmour)
-        item_name_to_find = "The Squire"
-        item_category = ItemType.UNIQUE_ARMOUR
-        print(f"\nSearching for '{item_name_to_find}' in {item_category.value}...")
-        the_squire: Optional[ItemLine] = client.find_item(
-            name=item_name_to_find,
-            item_type=item_category
+        # 4. Get history for Divine Orb
+        currency_name_for_history = "Divine Orb"
+        currency_type_for_id_lookup = CurrencyType.CURRENCY
+        
+        print(f"\nFetching numeric ID for '{currency_name_for_history}'...")
+        divine_orb_numeric_id: Optional[int] = client.get_currency_id_by_name(
+            currency_name_for_history, 
+            overview_type=currency_type_for_id_lookup
         )
-        if the_squire:
-            print(f"Found The Squire: {the_squire.chaosValue} Chaos, Divine Value: {the_squire.divineValue}")
-            print(f"  Icon: {the_squire.icon}")
+
+        if divine_orb_numeric_id is not None:
+            print(f"Found numeric ID for {currency_name_for_history}: {divine_orb_numeric_id}")
+            print(f"Fetching history for '{currency_name_for_history}' (ID: {divine_orb_numeric_id}, Type: {currency_type_for_id_lookup.value})...")
+            divine_history: HistoryResponse = client.get_currency_history(
+                currency_type_for_history=currency_type_for_id_lookup,
+                currency_id=divine_orb_numeric_id
+            )
+            print(f"  Found {len(divine_history.data_points)} historical data points.")
+            if divine_history.data_points:
+                print(f"  Latest point: {divine_history.data_points[0].daysAgo} days ago, value: {divine_history.data_points[0].value}")
         else:
-            print(f"'{item_name_to_find}' not found in {item_category.value}.")
+            print(f"Could not find numeric ID for '{currency_name_for_history}'.")
             
-        # 5. Find a specific Skill Gem: Empower Support
-        gem_name_to_find = "Empower Support" # Note: poe.ninja might list variants like "Empower Support (Level 4)"
-        gem_category = ItemType.SKILL_GEM
-        print(f"\nSearching for '{gem_name_to_find}' in {gem_category.value}...")
-        # For items with variants (like gem levels/quality), the name needs to be exact or logic needs to handle partial matches.
-        # The current find_item is an exact (case-insensitive) name match.
-        empower_gem: Optional[ItemLine] = client.find_item(
-            name=gem_name_to_find, # You might need to search for "Empower Support (Level 4)" for specific results
-            item_type=gem_category
+        # 5. Find a specific item's overview data: The Squire
+        item_name_to_find = "The Squire"
+        item_category_for_find = ItemType.UNIQUE_ARMOUR # Shields are under UniqueArmour
+        print(f"\nSearching for '{item_name_to_find}' overview data in {item_category_for_find.value}...")
+        the_squire_line: Optional[ItemLine] = client.find_item_line(
+            name=item_name_to_find,
+            item_type=item_category_for_find
         )
-        if empower_gem:
-            print(f"Found {empower_gem.name}: Chaos: {empower_gem.chaosValue}, Level: {empower_gem.gemLevel}, Quality: {empower_gem.gemQuality}")
+        if the_squire_line:
+            print(f"Found The Squire in overview: {the_squire_line.chaosValue} Chaos")
+            
+            # 6. Get history for The Squire (using its numeric ID)
+            print(f"\nFetching numeric ID for '{item_name_to_find}'...")
+            squire_numeric_id: Optional[int] = client.get_item_id_by_name(
+                item_name=item_name_to_find,
+                item_type=item_category_for_find
+            )
+            if squire_numeric_id:
+                print(f"Found numeric ID for {item_name_to_find}: {squire_numeric_id}")
+                print(f"Fetching history for '{item_name_to_find}' (ID: {squire_numeric_id}, Type: {item_category_for_find.value})...")
+                squire_history: HistoryResponse = client.get_item_history(
+                    item_type_for_history=item_category_for_find,
+                    item_id=squire_numeric_id
+                )
+                print(f"  Found {len(squire_history.data_points)} historical data points.")
+                if squire_history.data_points:
+                    print(f"  Latest point: {squire_history.data_points[0].daysAgo} days ago, value: {squire_history.data_points[0].value}")
+            else:
+                print(f"Could not find numeric ID for '{item_name_to_find}'.")
         else:
-            print(f"'{gem_name_to_find}' (exact match) not found. Try specifying level/variant if applicable.")
+            print(f"'{item_name_to_find}' not found in {item_category_for_find.value} overview.")
 
 
 except PoeNinjaRequestError as e:
     print(f"Request Error: {e} (Status Code: {e.status_code})")
 except PoeNinjaAPIError as e:
     print(f"API Error: {e}")
-except ValueError as e: # For issues like empty league string
+except ValueError as e: 
     print(f"Configuration error: {e}")
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
@@ -146,33 +173,59 @@ except Exception as e:
 ## API Client Reference
 
 ### `PoENinja(league: str, user_agent: str = ...)`
-Initializes the client for a specific `league`.
+Initializes the client for a specific `league`. The league name is mandatory.
 
 ### Methods
 
-* `get_currency_overview(currency_type: CurrencyType) -> CurrencyOverviewResponse`
-* `get_item_overview(item_type: ItemType) -> ItemOverviewResponse`
-* `find_currency(name: str, currency_type: CurrencyType) -> Optional[CurrencyLine]`
-* `find_item(name: str, item_type: ItemType) -> Optional[ItemLine]`
-* `close()`: Closes the session. Also called automatically when using a context manager.
+* **`get_currency_overview(currency_type: CurrencyType) -> CurrencyOverviewResponse`**
+    Fetches an overview of currencies for the specified `currency_type` (e.g., `CurrencyType.CURRENCY`, `CurrencyType.FRAGMENT`).
+
+* **`get_item_overview(item_type: ItemType) -> ItemOverviewResponse`**
+    Fetches an overview of items for the specified `item_type` (e.g., `ItemType.UNIQUE_WEAPON`, `ItemType.DIVINATION_CARD`).
+
+* **`find_currency_line(name: str, currency_type: CurrencyType) -> Optional[CurrencyLine]`**
+    Searches the result of `get_currency_overview` for a currency by its exact name (case-insensitive). Returns the `CurrencyLine` object if found, else `None`.
+
+* **`find_item_line(name: str, item_type: ItemType) -> Optional[ItemLine]`**
+    Searches the result of `get_item_overview` for an item by its exact name (case-insensitive). Returns the `ItemLine` object if found, else `None`.
+
+* **`get_currency_id_by_name(currency_name: str, overview_type: CurrencyType = CurrencyType.CURRENCY) -> Optional[int]`**
+    Retrieves the numeric ID of a currency by its name. This ID is found in the `currencyDetails` part of a `CurrencyOverviewResponse` and is used as `currencyId` for the `get_currency_history` method.
+
+* **`get_item_id_by_name(item_name: str, item_type: ItemType) -> Optional[int]`**
+    Retrieves the numeric ID of an item by its name. This ID is found in the `ItemLine.id` field from an `ItemOverviewResponse` and is used as `itemId` for the `get_item_history` method.
+
+* **`get_currency_history(currency_type_for_history: CurrencyType, currency_id: int) -> HistoryResponse`**
+    Fetches 7-day price history for a specific currency.
+    * `currency_type_for_history`: The `CurrencyType` Enum member (e.g., `CurrencyType.CURRENCY`).
+    * `currency_id`: The numeric ID of the currency (obtained via `get_currency_id_by_name`).
+
+* **`get_item_history(item_type_for_history: ItemType, item_id: int) -> HistoryResponse`**
+    Fetches 7-day price history for a specific item.
+    * `item_type_for_history`: The `ItemType` Enum member (e.g., `ItemType.UNIQUE_JEWEL`).
+    * `item_id`: The numeric ID of the item (obtained via `get_item_id_by_name`).
+
+* **`close()`**: Closes the underlying HTTP session. Called automatically when using the client as a context manager (`with PoENinja(...) as client:`).
 
 ### Enums
 
-* `poe_ninja_client.CurrencyType`: Enum for currency categories.
-    * Examples: `CurrencyType.CURRENCY`, `CurrencyType.FRAGMENT`, `CurrencyType.OIL`, etc.
-* `poe_ninja_client.ItemType`: Enum for item categories.
-    * Examples: `ItemType.UNIQUE_WEAPON`, `ItemType.UNIQUE_ARMOUR`, `ItemType.SKILL_GEM`, `ItemType.DIVINATION_CARD`, etc.
+Located in `poe_ninja_client.enums`:
 
-*(Note: The Enum lists in `enums.py` are not exhaustive and should be expanded to cover all types supported by the poe.ninja API.)*
+* **`CurrencyType(str, Enum)`**: Defines valid types for currency overviews and currency history (e.g., `CURRENCY`, `FRAGMENT`, `OIL`, `SCARAB`).
+* **`ItemType(str, Enum)`**: Defines valid types for item overviews and item history (e.g., `UNIQUE_WEAPON`, `UNIQUE_ARMOUR`, `SKILL_GEM`, `DIVINATION_CARD`, `MAP`).
+
+*(Note: The Enum lists in `enums.py` aim to be comprehensive but should be verified against poe.ninja's current API capabilities for all supported types.)*
 
 ### Data Models
 
-The client returns data parsed into dataclasses (found in `poe_ninja_client.models`):
-* `CurrencyOverviewResponse` (contains `list[CurrencyLine]`)
-* `ItemOverviewResponse` (contains `list[ItemLine]`)
-* `CurrencyLine`, `ItemLine`, `CurrencyTradeData`, `SparkLineData`, `ItemSparkLine`
+The client returns data parsed into dataclasses, defined in `poe_ninja_client.models`. Key models include:
 
-Refer to `models.py` for the structure of these objects.
+* `CurrencyOverviewResponse`: Contains `lines: list[CurrencyLine]` and `currencyDetails: list[CurrencyDetail]`.
+* `ItemOverviewResponse`: Contains `lines: list[ItemLine]`.
+* `HistoryResponse`: Contains `data_points: list[PoeNinjaHistoryDataPoint]`.
+* Individual line/detail models: `CurrencyLine`, `CurrencyDetail`, `ItemLine`, `PoeNinjaHistoryDataPoint`, `SparkLineData`, `CurrencyTradeData`, `ItemSparkLine`.
+
+Refer to `models.py` for the detailed structure and fields of these objects.
 
 ## Contributing
 
